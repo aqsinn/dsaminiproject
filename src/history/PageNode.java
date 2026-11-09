@@ -2,11 +2,13 @@ package history;
 
 import java.time.LocalDateTime;
 
+// one visited page
 public class PageNode {
     private final String url;
     private final String title;
     private final LocalDateTime timestamp;
 
+    // links to neighbours, only the list and history touch these
     PageNode prev;
     PageNode next;
 
