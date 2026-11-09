@@ -68,18 +68,4 @@ public class BrowserHistory {
     public List<PageNode> getAllPages() {
         return history.toList();
     }
-
-    // print history, current page marked
-    public void display_history() {
-        PageNode temp = history.getHead();
-        System.out.println("Browsing History:");
-        while (temp != null) {
-            if (temp == current) {
-                System.out.println(temp.getUrl() + " [<]");
-            } else {
-                System.out.println(temp.getUrl());
-            }
-            temp = temp.getNext();
-        }
-    }
 }

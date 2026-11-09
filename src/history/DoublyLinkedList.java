@@ -6,13 +6,10 @@ import java.util.List;
 // doubly linked list of pages
 public class DoublyLinkedList {
     private PageNode head;
-    private PageNode tail;
     private int size;
 
-    public boolean isEmpty()  { return size == 0; }
-    public int size()         { return size; }
-    public PageNode getHead() { return head; }
-    public PageNode getTail() { return tail; }
+    public boolean isEmpty() { return size == 0; }
+    public int size()        { return size; }
 
     // insert newNode after node, o(1)
     public PageNode insertAfter(PageNode node, PageNode newNode) {
@@ -21,7 +18,7 @@ public class DoublyLinkedList {
         // first node of an empty list
         if (node == null) {
             if (!isEmpty()) throw new IllegalStateException("node is null but list is not empty");
-            head = tail = newNode;
+            head = newNode;
             newNode.prev = newNode.next = null;
             size = 1;
             return newNode;
@@ -30,7 +27,6 @@ public class DoublyLinkedList {
         newNode.prev = node;
         newNode.next = node.next;
         if (node.next != null) node.next.prev = newNode;
-        else tail = newNode;
         node.next = newNode;
         size++;
         return newNode;
@@ -42,7 +38,6 @@ public class DoublyLinkedList {
         PageNode removed = head;
         head = head.next;
         if (head != null) head.prev = null;
-        else tail = null;
         removed.next = null;
         size--;
         return removed;
@@ -61,21 +56,8 @@ public class DoublyLinkedList {
             count++;
         }
         node.next = null;
-        tail = node;
         size -= count;
         return count;
-    }
-
-    // empty the list
-    public void clear() {
-        PageNode cur = head;
-        while (cur != null) {
-            PageNode nxt = cur.next;
-            cur.prev = cur.next = null;
-            cur = nxt;
-        }
-        head = tail = null;
-        size = 0;
     }
 
     // copy of the list, head to tail

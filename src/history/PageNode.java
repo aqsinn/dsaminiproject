@@ -5,31 +5,19 @@ import java.time.LocalDateTime;
 // one visited page
 public class PageNode {
     private final String url;
-    private final String title;
     private final LocalDateTime timestamp;
 
     // links to neighbours, only the list and history touch these
     PageNode prev;
     PageNode next;
 
-    public PageNode(String url, String title) {
+    public PageNode(String url) {
         this.url = url;
-        this.title = (title == null || title.isEmpty()) ? url : title;
         this.timestamp = LocalDateTime.now();
     }
 
-    public PageNode(String url) {
-        this(url, null);
-    }
-
     public String getUrl()              { return url; }
-    public String getTitle()            { return title; }
     public LocalDateTime getTimestamp() { return timestamp; }
     public PageNode getPrev()           { return prev; }
     public PageNode getNext()           { return next; }
-
-    @Override
-    public String toString() {
-        return title + " (" + url + ")";
-    }
 }

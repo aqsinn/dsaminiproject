@@ -1,5 +1,9 @@
+package gui;
+
+import javafx.application.Application;
+
 public class Main {
-    static void main(String[] args) {
-        FXGUI.launch(FXGUI.class, args);
+    public static void main(String[] args) {
+        Application.launch(FXGUI.class, args);
     }
 }

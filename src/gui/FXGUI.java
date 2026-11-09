@@ -1,3 +1,7 @@
+package gui;
+
+import history.BrowserHistory;
+import history.PageNode;
 import javafx.animation.PauseTransition;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
@@ -9,7 +13,15 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
-import javafx.scene.layout.*;
+import javafx.scene.layout.Background;
+import javafx.scene.layout.BackgroundFill;
+import javafx.scene.layout.ColumnConstraints;
+import javafx.scene.layout.CornerRadii;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.RowConstraints;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontPosture;
@@ -18,20 +30,44 @@ import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
-import java.awt.*;
-import java.net.URI;
-import java.sql.*;
-
+import java.time.format.DateTimeFormatter;
 
 public class FXGUI extends Application {
 
-    public void openLink(String link, Desktop desktop, ObservableList urllist) {
-        try {
-            desktop.browse(new URI(link));
-            urllist.add(new Record(link));
-        } catch (Exception ex) {
-            System.out.println("Desktop not available");
+    private static final String HOME = "Home Page";
+    private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    // history lives in memory only
+    private final BrowserHistory browser = new BrowserHistory(HOME);
+    private final ObservableList<PageNode> pages = FXCollections.observableArrayList();
+
+    private Stage stage;
+    private Text text;
+    private Text meta;
+    private Button previous;
+    private Button next;
+    private ListView<PageNode> list;
+
+    // sync every control with the model
+    private void refresh() {
+        PageNode cur = browser.current_page();
+        text.setText("Current Page: " + cur.getUrl());
+        meta.setText("Visited: " + FMT.format(cur.getTimestamp()));
+        stage.setTitle(cur.getUrl());
+        previous.setDisable(!browser.canGoBack());
+        next.setDisable(!browser.canGoForward());
+        pages.setAll(browser.getAllPages());
+        list.refresh();
+        list.scrollTo(pages.indexOf(cur));
+    }
+
+    private void visit(String url) {
+        String clean = url.trim();
+        if (clean.isEmpty()) {
+            return;
         }
+        browser.visit(clean);
+        refresh();
     }
 
     public void hide(Text t, int sec) {
@@ -42,7 +78,8 @@ public class FXGUI extends Application {
 
     @Override
     public void start(Stage stage) {
-        NativeHistory history = new NativeHistory();
+        this.stage = stage;
+
         GridPane root_m = new GridPane();
         GridPane secondary = new GridPane();
         VBox root = new VBox();
@@ -51,59 +88,41 @@ public class FXGUI extends Application {
         hist_page.setBackground(Background.fill(Color.LIMEGREEN));
         Scene scene = new Scene(root_m, 800, 600);
         Scene hist = new Scene(secondary, 800, 600);
-        ListView<Record> list = new ListView<>();
-        ObservableList<Record> urllist = FXCollections.observableArrayList();
-        list.setItems(urllist);
-        boolean restored = true;
+
+        list = new ListView<>(pages);
         list.setBackground(Background.fill(Color.LIGHTCORAL));
-        try {
-            ResultSet rs;
-            Connection con = Database.connect();
-            Database.createTable(con);
-            Statement st = con.createStatement();
-            rs = st.executeQuery("SELECT RECORD, DATE FROM HISTORY");
-            while (rs.next()) {
-                System.out.println(rs.getString(1));
-                System.out.println(rs.getString(2));
-                Record re = new Record(rs.getString(1), rs.getString(2));
-                System.out.println(re);
-                urllist.add(re);
-            }
-            System.out.println();
-            System.out.println(urllist);
-        } catch (SQLException e) {
-            restored = false;
-            System.out.println("state not restored");
-        }
         list.setCellFactory(lv -> new ListCell<>() {
             @Override
-            protected void updateItem(Record item, boolean empty) {
+            protected void updateItem(PageNode item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty || item == null) {
                     setText(null);
                 } else {
-                    int number = getIndex() + 1;
-                    setText(number + ".  " + item);
+                    // mark the page we are on
+                    String mark = item == browser.current_page() ? "   <" : "";
+                    setText((getIndex() + 1) + ".  " + item.getUrl() + "   " + FMT.format(item.getTimestamp()) + mark);
                 }
             }
         });
-        list.scrollTo(urllist.size());
-        stage.setTitle("Home Page");
-        Text text = new Text("Current Page: Home Page");
+
+        text = new Text();
+        meta = new Text();
         Text welcome = new Text("Welcome");
         HBox hb = new HBox();
-        Button previous = new Button("Previous");
-        Button next = new Button("Next");
+        previous = new Button("Previous");
+        next = new Button("Next");
         Button home = new Button("Home");
-        home.setOnAction(e -> {
-            text.setText("Current Page: Home Page");
-        });
+
+        home.setOnAction(e -> visit(HOME));
         previous.setOnAction(e -> {
-            text.setText(history.addPage());
+            browser.back(1);
+            refresh();
         });
         next.setOnAction(e -> {
-            text.setText(history.addPage());
+            browser.forward(1);
+            refresh();
         });
+
         hb.setAlignment(Pos.CENTER);
         VBox.setMargin(hb, new Insets(20, 10, 10, 10));
         HBox.setMargin(previous, new Insets(20, 10, 10, 10));
@@ -116,98 +135,86 @@ public class FXGUI extends Application {
         HBox.setHgrow(home, Priority.ALWAYS);
         HBox.setHgrow(next, Priority.ALWAYS);
         hb.getChildren().addAll(previous, home, next);
-//        stage.heightProperty().addListener((observable, oldValue, newHeight) -> {
-//        double bMargin = newHeight.doubleValue() * 0.11;
-//         VBox.setMargin(welcome, new Insets(10, 10, bMargin, 10));
-//        });
 
-
-        text.setX(15);
-        text.setY(40);
-        text.setFont(Font.font("Arial", 40));
-        welcome.setX(20);
-        welcome.setY(80);
+        text.setFont(Font.font("Arial", 30));
+        text.setFill(Color.DARKCYAN);
+        text.wrappingWidthProperty().bind(root.widthProperty().subtract(40));
+        meta.setFont(Font.font("Arial", 16));
+        meta.setFill(Color.DARKSLATEGRAY);
         welcome.setFont(Font.font("Arial", 40));
         welcome.setFill(Color.LIGHTCORAL);
-        text.setFill(Color.DARKCYAN);
+
         TextField textfield = new TextField();
         textfield.setPromptText("Enter URL");
         textfield.setFont(Font.font("Arial", FontWeight.BOLD, FontPosture.REGULAR, 20));
         textfield.setBackground(Background.fill(Color.ORANGERED));
-        VBox.setMargin(textfield, new Insets(10, 10, 10, 10));
         textfield.prefWidthProperty().bind(root.widthProperty().multiply(0.6));
-        Button button = new Button();
-        Button displayhist = new Button();
-        displayhist.setText("Display History");
-        Button back = new Button();
-        back.setText("Back");
+        VBox.setMargin(textfield, new Insets(0, 70, 0, 70));
+
+        Button button = new Button("Open URL");
+        Button displayhist = new Button("Display History");
+        Button back = new Button("Return");
+        button.disableProperty().bind(textfield.textProperty().isEmpty());
+        button.prefWidthProperty().bind(stage.widthProperty().multiply(0.6));
+        displayhist.prefWidthProperty().bind(stage.widthProperty().multiply(0.6));
         VBox.setMargin(button, new Insets(10, 10, 10, 10));
         VBox.setMargin(displayhist, new Insets(10, 10, 10, 10));
-        VBox.setMargin(text, new Insets(30, 10, 10, 10));
-        VBox.setMargin(welcome, new Insets(10, 10, 70, 10));
-        Desktop desktop = Desktop.getDesktop();
+        VBox.setMargin(text, new Insets(30, 10, 0, 10));
+        VBox.setMargin(meta, new Insets(0, 10, 10, 10));
+        VBox.setMargin(welcome, new Insets(10, 10, 40, 10));
         VBox.setMargin(back, new Insets(10, 10, 10, 10));
         VBox.setMargin(list, new Insets(20, 20, 20, 20));
         list.setPadding(new Insets(10, 10, 10, 10));
-        hist_page.getChildren().addAll(back, list);
+        root.setAlignment(Pos.BASELINE_CENTER);
+
+        // open url from button or enter key
+        Runnable submit = () -> {
+            String url = textfield.getText();
+            textfield.clear();
+            visit(url);
+        };
+        button.setOnAction(e -> submit.run());
+        textfield.setOnAction(e -> submit.run());
+
+        // click a history entry to jump to it
         list.setOnMouseClicked(event -> {
-            Record rec = list.getSelectionModel().getSelectedItem();
-            if (rec != null) {
-                openLink(rec.link, desktop, urllist);
+            PageNode picked = list.getSelectionModel().getSelectedItem();
+            if (picked == null) {
+                return;
             }
+            int target = pages.indexOf(picked);
+            int now = pages.indexOf(browser.current_page());
+            if (target < now) {
+                browser.back(now - target);
+            } else if (target > now) {
+                browser.forward(target - now);
+            }
+            refresh();
+        });
+
+        displayhist.setOnAction(e -> {
+            refresh();
+            stage.setScene(hist);
         });
         back.setOnAction(e -> stage.setScene(scene));
-        button.setText("Open URL");
-        button.disableProperty().bind(textfield.textProperty().isEmpty());
-        button.setOnAction(e -> {
-            String url = textfield.getText();
-            textfield.clear();
-            openLink(url, desktop, urllist);
-        });
-        button.prefWidthProperty().bind(stage.widthProperty().multiply(0.6));
-        displayhist.prefWidthProperty().bind(stage.widthProperty().multiply(0.6));
-        VBox.setMargin(textfield, new Insets(0, 70, 0, 70));
-        root.setAlignment(Pos.BASELINE_CENTER);
-        textfield.setOnAction(e -> {
-            String url = textfield.getText();
-            urllist.add(new Record(url));
-            textfield.clear();
-            try {
-                desktop.browse(new URI(url));
-            } catch (Exception ex) {
-                System.out.println("Desktop not available");
-            }
-        });
-        displayhist.setOnAction(e -> stage.setScene(hist));
+
+        hist_page.getChildren().addAll(back, list);
+
         ColumnConstraints col1 = new ColumnConstraints();
         RowConstraints row1 = new RowConstraints();
         col1.setPercentWidth(100);
         row1.setPercentHeight(100);
-        root_m.getColumnConstraints().addAll(col1);
-        secondary.getRowConstraints().addAll(row1);
-        secondary.getColumnConstraints().addAll(col1);
-        root_m.getRowConstraints().addAll(row1);
+        root_m.getColumnConstraints().add(col1);
+        root_m.getRowConstraints().add(row1);
+        secondary.getColumnConstraints().add(col1);
+        secondary.getRowConstraints().add(row1);
         root_m.getChildren().addFirst(root);
-        String get_all = "INSERT INTO HISTORY (RECORD, DATE) VALUES (?,?)";
         secondary.getChildren().addFirst(hist_page);
-        if (restored) {
-            stage.setOnCloseRequest(e -> {
-                Connection connection = Database.connect();
-                Database.createTable(connection);
-                Database.clearTable(connection);
-                try (PreparedStatement ps = connection.prepareStatement(get_all)) {
-                    for (Record r : urllist) {
-                        ps.setString(2, r.date);
-                        ps.setString(1, r.link);
-                        ps.executeUpdate();
-                    }
-                } catch (SQLException ex) {
-                    throw new RuntimeException(ex);
-                }
-            });
-        }
-        root.getChildren().addAll(text, welcome, textfield, hb, button, displayhist);
+
+        root.getChildren().addAll(text, meta, welcome, textfield, hb, button, displayhist);
         hide(welcome, 3);
+
+        refresh();
         stage.setScene(scene);
         stage.show();
     }
