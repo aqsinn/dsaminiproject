@@ -16,6 +16,12 @@ public class PageNode {
         this.timestamp = LocalDateTime.now();
     }
 
+    // used when importing history from a file (keeps the saved time)
+    public PageNode(String url, LocalDateTime timestamp) {
+        this.url = url;
+        this.timestamp = timestamp;
+    }
+
     public String getUrl()              { return url; }
     public LocalDateTime getTimestamp() { return timestamp; }
     public PageNode getPrev()           { return prev; }

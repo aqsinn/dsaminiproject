@@ -9,6 +9,7 @@ import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -17,6 +18,7 @@ import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.CornerRadii;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -27,9 +29,12 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontPosture;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
+import java.io.File;
+import java.io.IOException;
 import java.time.format.DateTimeFormatter;
 
 public class FXGUI extends Application {
@@ -68,6 +73,11 @@ public class FXGUI extends Application {
         }
         browser.visit(clean);
         refresh();
+    }
+
+    // small popup message
+    private void info(String msg) {
+        new Alert(Alert.AlertType.INFORMATION, msg).showAndWait();
     }
 
     public void hide(Text t, int sec) {
@@ -198,7 +208,79 @@ public class FXGUI extends Application {
         });
         back.setOnAction(e -> stage.setScene(scene));
 
-        hist_page.getChildren().addAll(back, list);
+        // extra history controls: delete / restore / clear / export / import
+        Button deleteCur = new Button("Delete Current Page");
+        Button restore = new Button("Restore Last Deleted");
+        Button clearAll = new Button("Delete All History");
+        Button export = new Button("Export");
+        Button importBtn = new Button("Import");
+        TextField delField = new TextField();
+        delField.setPromptText("URL to delete");
+        Button delUrl = new Button("Delete URL");
+        delUrl.disableProperty().bind(delField.textProperty().isEmpty());
+
+        FlowPane tools = new FlowPane(10, 10);
+        tools.setPadding(new Insets(10, 20, 0, 20));
+        tools.getChildren().addAll(deleteCur, restore, clearAll, export, importBtn, delField, delUrl);
+
+        deleteCur.setOnAction(e -> {
+            if (browser.deleteCurrentPage()) {
+                refresh();
+            } else {
+                info("The last remaining page can't be deleted. Use Delete All History instead.");
+            }
+        });
+        restore.setOnAction(e -> {
+            if (browser.restoreLastDeleted() == null) {
+                info("Nothing to restore.");
+            }
+            refresh();
+        });
+        clearAll.setOnAction(e -> {
+            browser.deleteHistory();
+            refresh();
+        });
+        delUrl.setOnAction(e -> {
+            int n = browser.deleteUrl(delField.getText().trim());
+            delField.clear();
+            if (n == 0) {
+                info("No deletable page with that URL.");
+            }
+            refresh();
+        });
+        export.setOnAction(e -> {
+            FileChooser fc = new FileChooser();
+            fc.setTitle("Export history");
+            fc.setInitialFileName("history.txt");
+            fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("Text files", "*.txt"));
+            File f = fc.showSaveDialog(stage);
+            if (f == null) {
+                return;
+            }
+            try {
+                browser.exportHistory(f.getAbsolutePath());
+            } catch (IOException ex) {
+                info("Export failed: " + ex.getMessage());
+            }
+        });
+        importBtn.setOnAction(e -> {
+            FileChooser fc = new FileChooser();
+            fc.setTitle("Import history");
+            fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("Text files", "*.txt"));
+            File f = fc.showOpenDialog(stage);
+            if (f == null) {
+                return;
+            }
+            try {
+                browser.importHistory(f.getAbsolutePath());
+                refresh();
+            } catch (IOException ex) {
+                info("Import failed: " + ex.getMessage());
+            }
+        });
+
+        VBox.setVgrow(list, Priority.ALWAYS);
+        hist_page.getChildren().addAll(back, tools, list);
 
         ColumnConstraints col1 = new ColumnConstraints();
         RowConstraints row1 = new RowConstraints();
